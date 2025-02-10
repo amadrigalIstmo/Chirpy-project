@@ -1,0 +1,43 @@
+# Binarios compilados
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Archivos de prueba
+*.test
+
+# Archivos de cobertura
+*.out
+
+# Directorios de dependencias
+/vendor/
+
+# Directorio de módulos Go
+/go.sum
+/go.mod
+
+# Archivos y carpetas específicos del IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Carpeta de versiones anteriores
+versiones_anteriores/
+
+# Archivos de depuración
+debug
+
+# Archivos temporales
+*.tmp
+
+# Archivos de log
+*.log
+
+# Si estás usando MacOS
+.DS_Store
+
+# Directorios que Go usa para caché
+.cache/
