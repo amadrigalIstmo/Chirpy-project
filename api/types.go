@@ -21,11 +21,6 @@ type ChirpCreationParams struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
-type ChirpRequest struct {
-	Body   string    `json:"body"`
-	UserID uuid.UUID `json:"user_id"`
-}
-
 type CreateUserRequest struct {
 	Email string `json:"email"`
 }
@@ -35,12 +30,4 @@ type CreateUserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
-}
-
-type ChirpResponse struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt string    `json:"created_at"`
-	UpdatedAt string    `json:"updated_at"`
-	Body      string    `json:"body"`
-	UserID    uuid.UUID `json:"user_id"`
 }
