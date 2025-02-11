@@ -2,9 +2,8 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/amadrigalIstmo/Chirpy-project/api"
@@ -12,62 +11,54 @@ import (
 	"github.com/google/uuid"
 )
 
-const maxChirpLength = 140
-
-var profaneWords = []string{"kerfuffle", "sharbert", "fornax"}
-
 func (h *Handler) CreateChirp(w http.ResponseWriter, r *http.Request) {
-	var req api.ChirpRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
-		return
-	}
-
-	if req.Body == "" {
-		api.RespondWithError(w, http.StatusBadRequest, "Chirp body cannot be empty")
-		return
-	}
-
-	if len(req.Body) > maxChirpLength {
-		api.RespondWithError(w, http.StatusBadRequest, "Chirp is too long")
-		return
-	}
-
-	if req.UserID == uuid.Nil {
-		api.RespondWithError(w, http.StatusBadRequest, "User ID is required")
-		return
-	}
-
-	cleanedText := filterProfanity(req.Body)
-
-	params := database.CreateChirpParams{
-		Body:   cleanedText,
-		UserID: req.UserID,
-	}
-
-	newChirp, err := h.db.CreateChirp(r.Context(), params)
+	decoder := json.NewDecoder(r.Body)
+	params := api.ChirpCreationParams{}
+	err := decoder.Decode(&params)
 	if err != nil {
-		log.Printf("Error creating chirp: %v", err)
-		api.RespondWithError(w, http.StatusInternalServerError, "Could not create chirp")
+		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
 	}
 
-	api.RespondWithJSON(w, http.StatusCreated, newChirp)
+	cleaned, err := validateChirp(params.Body)
+	if err != nil {
+		api.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
+	chirp, err := h.db.CreateChirp(r.Context(), database.CreateChirpParams{
+		Body:   cleaned,
+		UserID: params.UserID,
+	})
+	if err != nil {
+		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
+		return
+	}
+
+	response := api.Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	}
+
+	api.RespondWithJSON(w, http.StatusCreated, response)
 }
 
 func (h *Handler) GetChirps(w http.ResponseWriter, r *http.Request) {
 	chirps, err := h.db.GetChirps(r.Context())
 	if err != nil {
-		api.RespondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps")
+		api.RespondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps", err)
 		return
 	}
 
-	var response []api.ChirpResponse
+	var response []api.Chirp
 	for _, chirp := range chirps {
-		response = append(response, api.ChirpResponse{
+		response = append(response, api.Chirp{
 			ID:        chirp.ID,
-			CreatedAt: chirp.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			UpdatedAt: chirp.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
 			Body:      chirp.Body,
 			UserID:    chirp.UserID,
 		})
@@ -76,20 +67,59 @@ func (h *Handler) GetChirps(w http.ResponseWriter, r *http.Request) {
 	api.RespondWithJSON(w, http.StatusOK, response)
 }
 
-func filterProfanity(text string) string {
-	words := strings.Fields(text)
+func (h *Handler) GetChirpByID(w http.ResponseWriter, r *http.Request) {
+	chirpIDStr := r.PathValue("chirpID")
+	if chirpIDStr == "" {
+		api.RespondWithError(w, http.StatusBadRequest, "Chirp ID is required", nil)
+		return
+	}
+
+	chirpID, err := uuid.Parse(chirpIDStr)
+	if err != nil {
+		api.RespondWithError(w, http.StatusBadRequest, "Invalid chirp ID format", err)
+		return
+	}
+
+	chirp, err := h.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		api.RespondWithError(w, http.StatusNotFound, "Chirp not found", err)
+		return
+	}
+
+	response := api.Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	}
+
+	api.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func validateChirp(body string) (string, error) {
+	const maxChirpLength = 140
+	if len(body) > maxChirpLength {
+		return "", errors.New("Chirp is too long")
+	}
+
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+
+	cleaned := getCleanedBody(body, badWords)
+	return cleaned, nil
+}
+
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
 	for i, word := range words {
-		cleanWord := removePunctuation(word)
-		for _, badWord := range profaneWords {
-			if strings.EqualFold(cleanWord, badWord) {
-				words[i] = "****"
-			}
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
+			words[i] = "****"
 		}
 	}
 	return strings.Join(words, " ")
-}
-
-func removePunctuation(word string) string {
-	re := regexp.MustCompile(`[^\w]`)
-	return re.ReplaceAllString(word, "")
 }

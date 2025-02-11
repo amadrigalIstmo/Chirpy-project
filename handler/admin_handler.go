@@ -21,13 +21,13 @@ func NewHandler(db *database.Queries, platform string) *Handler {
 
 func (h *Handler) ResetDatabase(w http.ResponseWriter, r *http.Request) {
 	if h.platform != "dev" {
-		api.RespondWithError(w, http.StatusForbidden, "Action not allowed in production")
+		api.RespondWithError(w, http.StatusForbidden, "Action not allowed in production", nil)
 		return
 	}
 
 	err := h.db.Reset(r.Context())
 	if err != nil {
-		api.RespondWithError(w, http.StatusInternalServerError, "Could not reset database")
+		api.RespondWithError(w, http.StatusInternalServerError, "Could not reset database", err)
 		return
 	}
 
