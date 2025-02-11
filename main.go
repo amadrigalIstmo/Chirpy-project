@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/amadrigalIstmo/Chirpy-project/internal/database"
 
@@ -33,6 +34,21 @@ type chirpRequest struct {
 
 type createUserRequest struct {
 	Email string `json:"email"`
+}
+
+type createUserResponse struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
+type chirpResponse struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt string    `json:"created_at"`
+	UpdatedAt string    `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
 func main() {
@@ -64,7 +80,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	mux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
-	//mux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps) // Nueva ruta GET
+	mux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps) // Nuevo endpoint GET
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerResetDatabase)
 
 	server := &http.Server{
@@ -136,13 +152,23 @@ func (apiCfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Crear usuario en la base de datos
 	newUser, err := apiCfg.DB.CreateUser(r.Context(), req.Email)
 	if err != nil {
+		log.Printf("Error al crear usuario: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Could not create user")
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, newUser)
+	// Construir la respuesta con los campos esperados
+	response := createUserResponse{
+		ID:        newUser.ID,
+		CreatedAt: newUser.CreatedAt,
+		UpdatedAt: newUser.UpdatedAt,
+		Email:     newUser.Email,
+	}
+
+	respondWithJSON(w, http.StatusCreated, response)
 }
 
 func (apiCfg *apiConfig) handlerResetDatabase(w http.ResponseWriter, r *http.Request) {
@@ -158,6 +184,27 @@ func (apiCfg *apiConfig) handlerResetDatabase(w http.ResponseWriter, r *http.Req
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Database reset successful"})
+}
+
+func (apiCfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := apiCfg.DB.GetChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not retrieve chirps")
+		return
+	}
+
+	var response []chirpResponse
+	for _, chirp := range chirps {
+		response = append(response, chirpResponse{
+			ID:        chirp.ID,
+			CreatedAt: chirp.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt: chirp.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			Body:      chirp.Body,
+			UserID:    chirp.UserID,
+		})
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {

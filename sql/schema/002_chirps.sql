@@ -10,6 +10,3 @@ CREATE TABLE chirps (
 -- +goose Down
 DROP TABLE chirps;
 
--- name: GetChirps :many
-SELECT * FROM chirps
-ORDER BY created_at ASC;
