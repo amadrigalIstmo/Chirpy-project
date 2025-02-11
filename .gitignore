@@ -41,3 +41,6 @@ debug
 
 # Directorios que Go usa para caché
 .cache/
+
+
+.env
