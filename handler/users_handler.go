@@ -2,10 +2,11 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/amadrigalIstmo/Chirpy-project/api"
+	"github.com/amadrigalIstmo/Chirpy-project/internal/auth"
+	"github.com/amadrigalIstmo/Chirpy-project/internal/database"
 )
 
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -15,18 +16,32 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" {
-		api.RespondWithError(w, http.StatusBadRequest, "Email is required", nil)
+	if req.Email == "" || req.Password == "" {
+		api.RespondWithError(w, http.StatusBadRequest, "Email and password are required", nil)
 		return
 	}
 
-	newUser, err := h.db.CreateUser(r.Context(), req.Email)
+	// Hash de la contraseña antes de almacenarla
+	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
-		log.Printf("Error al crear usuario: %v", err)
+		api.RespondWithError(w, http.StatusInternalServerError, "Could not hash password", err)
+		return
+	}
+
+	// Crear estructura con los parámetros esperados
+	params := database.CreateUserParams{
+		Email:          req.Email,
+		HashedPassword: hashedPassword,
+	}
+
+	// Crear usuario en la base de datos
+	newUser, err := h.db.CreateUser(r.Context(), params)
+	if err != nil {
 		api.RespondWithError(w, http.StatusInternalServerError, "Could not create user", err)
 		return
 	}
 
+	// Respuesta sin incluir la contraseña
 	response := api.CreateUserResponse{
 		ID:        newUser.ID,
 		CreatedAt: newUser.CreatedAt,

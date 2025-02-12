@@ -7,43 +7,64 @@ import (
 	"strings"
 
 	"github.com/amadrigalIstmo/Chirpy-project/api"
+	"github.com/amadrigalIstmo/Chirpy-project/internal/auth"
 	"github.com/amadrigalIstmo/Chirpy-project/internal/database"
 	"github.com/google/uuid"
 )
 
+// / CreateChirp maneja la creación de un chirp, validando la autenticación con JWT.
 func (h *Handler) CreateChirp(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	// Obtener y validar el token JWT del header Authorization
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		api.RespondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, h.jwtSecret)
+	if err != nil {
+		api.RespondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
+	}
+
+	// Decodificar el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
-	params := api.ChirpCreationParams{}
-	err := decoder.Decode(&params)
+	params := parameters{}
+	err = decoder.Decode(&params)
 	if err != nil {
 		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
 	}
 
+	// Validar y limpiar el chirp
 	cleaned, err := validateChirp(params.Body)
 	if err != nil {
 		api.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
+	// Crear el chirp en la base de datos
 	chirp, err := h.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
 		return
 	}
 
-	response := api.Chirp{
+	// Responder con el chirp creado
+	api.RespondWithJSON(w, http.StatusCreated, api.Chirp{
 		ID:        chirp.ID,
 		CreatedAt: chirp.CreatedAt,
 		UpdatedAt: chirp.UpdatedAt,
 		Body:      chirp.Body,
 		UserID:    chirp.UserID,
-	}
-
-	api.RespondWithJSON(w, http.StatusCreated, response)
+	})
 }
 
 func (h *Handler) GetChirps(w http.ResponseWriter, r *http.Request) {

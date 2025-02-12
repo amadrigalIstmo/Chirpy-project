@@ -15,8 +15,9 @@ import (
 )
 
 type apiConfig struct {
-	DB       *database.Queries
-	Platform string
+	DB        *database.Queries
+	Platform  string
+	JWTSecret string // 🔹 Agregamos el campo para el secreto JWT
 }
 
 func main() {
@@ -28,6 +29,11 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
 		log.Fatal("DB_URL is not set in the environment variables")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is not set in the environment variables")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -45,7 +51,8 @@ func main() {
 		Platform: os.Getenv("PLATFORM"),
 	}
 
-	handlers := handler.NewHandler(apiCfg.DB, apiCfg.Platform)
+	// 🔹 Pasamos jwtSecret al crear el Handler
+	handlers := handler.NewHandler(apiCfg.DB, apiCfg.Platform, jwtSecret)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/users", handlers.CreateUser)
@@ -53,6 +60,9 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", handlers.GetChirps)
 	mux.HandleFunc("POST /admin/reset", handlers.ResetDatabase)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetChirpByID)
+	mux.HandleFunc("POST /api/login", handlers.Login)
+	mux.HandleFunc("POST /api/refresh", handlers.RefreshTokenHandler)
+	mux.HandleFunc("POST /api/revoke", handlers.RevokeTokenHandler)
 
 	server := &http.Server{
 		Addr:    ":8080",

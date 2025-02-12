@@ -8,14 +8,16 @@ import (
 )
 
 type Handler struct {
-	db       *database.Queries
-	platform string
+	db        *database.Queries
+	platform  string
+	jwtSecret string
 }
 
-func NewHandler(db *database.Queries, platform string) *Handler {
+func NewHandler(db *database.Queries, platform string, jwtSecret string) *Handler {
 	return &Handler{
-		db:       db,
-		platform: platform,
+		db:        db,
+		platform:  platform,
+		jwtSecret: jwtSecret,
 	}
 }
 
