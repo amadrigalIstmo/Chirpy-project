@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/amadrigalIstmo/Chirpy-project/api"
@@ -116,6 +117,65 @@ func (h *Handler) GetChirpByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.RespondWithJSON(w, http.StatusOK, response)
+}
+
+// PolkaGetChirps maneja la obtención de chirps con filtro opcional por author_id.
+// PolkaGetChirps maneja la obtención de chirps con filtro opcional por author_id y ordenamiento por created_at.
+func (h *Handler) PolkaGetChirps(w http.ResponseWriter, r *http.Request) {
+	// Obtener el parámetro opcional "author_id"
+	authorIDString := r.URL.Query().Get("author_id")
+
+	var authorID uuid.UUID
+	var filterByAuthor bool
+
+	if authorIDString != "" {
+		parsedID, err := uuid.Parse(authorIDString)
+		if err != nil {
+			api.RespondWithError(w, http.StatusBadRequest, "Invalid author ID", err)
+			return
+		}
+		authorID = parsedID
+		filterByAuthor = true
+	}
+
+	// Obtener todos los chirps de la base de datos
+	dbChirps, err := h.db.GetChirps(r.Context())
+	if err != nil {
+		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps", err)
+		return
+	}
+
+	// Obtener el parámetro opcional "sort"
+	sortDirection := r.URL.Query().Get("sort")
+	if sortDirection != "desc" { // "asc" es el valor por defecto
+		sortDirection = "asc"
+	}
+
+	// Filtrar chirps si se proporcionó un author_id
+	chirps := []api.Chirp{}
+	for _, dbChirp := range dbChirps {
+		if filterByAuthor && dbChirp.UserID != authorID {
+			continue
+		}
+
+		chirps = append(chirps, api.Chirp{
+			ID:        dbChirp.ID,
+			CreatedAt: dbChirp.CreatedAt,
+			UpdatedAt: dbChirp.UpdatedAt,
+			UserID:    dbChirp.UserID,
+			Body:      dbChirp.Body,
+		})
+	}
+
+	// Ordenar los chirps según el parámetro "sort"
+	sort.Slice(chirps, func(i, j int) bool {
+		if sortDirection == "desc" {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
+
+	api.RespondWithJSON(w, http.StatusOK, chirps)
 }
 
 func (h *Handler) DeleteChirp(w http.ResponseWriter, r *http.Request) {

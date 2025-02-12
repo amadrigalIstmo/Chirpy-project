@@ -65,7 +65,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/users", handlers.CreateUser)
 	mux.HandleFunc("POST /api/chirps", handlers.CreateChirp)
-	mux.HandleFunc("GET /api/chirps", handlers.GetChirps)
+	mux.HandleFunc("GET /api/chirps", handlers.PolkaGetChirps)
 	mux.HandleFunc("POST /admin/reset", handlers.ResetDatabase)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetChirpByID)
 	mux.HandleFunc("POST /api/polka/webhooks", handlers.PolkaWebhook)
