@@ -27,6 +27,12 @@ type CreateUserRequest struct {
 	Password string `json:"password"`
 }
 
+// Request para actualizar usuario
+type UpdateUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // Request para login
 type LoginRequest struct {
 	Email            string `json:"email"`
@@ -36,10 +42,11 @@ type LoginRequest struct {
 
 // Respuesta sin incluir la contraseña
 type CreateUserResponse struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 // Respuesta del login que incluye el token
@@ -50,4 +57,14 @@ type LoginResponse struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
+}
+
+// Response con los datos actualizados del usuario
+type UpdateUserResponse struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }

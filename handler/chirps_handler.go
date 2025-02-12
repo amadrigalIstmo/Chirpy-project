@@ -118,6 +118,57 @@ func (h *Handler) GetChirpByID(w http.ResponseWriter, r *http.Request) {
 	api.RespondWithJSON(w, http.StatusOK, response)
 }
 
+func (h *Handler) DeleteChirp(w http.ResponseWriter, r *http.Request) {
+	// Extraer el `chirpID` de la URL
+	chirpIDStr := r.PathValue("chirpID")
+	if chirpIDStr == "" {
+		api.RespondWithError(w, http.StatusBadRequest, "Chirp ID is required", nil)
+		return
+	}
+
+	chirpID, err := uuid.Parse(chirpIDStr)
+	if err != nil {
+		api.RespondWithError(w, http.StatusBadRequest, "Invalid chirp ID format", err)
+		return
+	}
+
+	// Extraer el `userID` desde el token JWT en los headers
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		api.RespondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, h.jwtSecret)
+	if err != nil {
+		api.RespondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
+	}
+
+	// Obtener el chirp desde la base de datos para verificar el dueño
+	chirp, err := h.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		api.RespondWithError(w, http.StatusNotFound, "Chirp not found", err)
+		return
+	}
+
+	// Verificar que el usuario autenticado sea el dueño del chirp
+	if chirp.UserID != userID {
+		api.RespondWithError(w, http.StatusForbidden, "You are not the owner of this chirp", nil)
+		return
+	}
+
+	// Eliminar el chirp
+	err = h.db.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		api.RespondWithError(w, http.StatusInternalServerError, "Couldn't delete chirp", err)
+		return
+	}
+
+	// Responder con éxito (204 No Content)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func validateChirp(body string) (string, error) {
 	const maxChirpLength = 140
 	if len(body) > maxChirpLength {

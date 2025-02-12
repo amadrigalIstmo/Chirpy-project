@@ -9,6 +9,7 @@ import (
 	"github.com/amadrigalIstmo/Chirpy-project/internal/database"
 )
 
+// CreateUser maneja la creación de un usuario
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req api.CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -28,25 +29,23 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Crear estructura con los parámetros esperados
-	params := database.CreateUserParams{
+	// Crear usuario en la base de datos
+	newUser, err := h.db.CreateUser(r.Context(), database.CreateUserParams{
 		Email:          req.Email,
 		HashedPassword: hashedPassword,
-	}
-
-	// Crear usuario en la base de datos
-	newUser, err := h.db.CreateUser(r.Context(), params)
+	})
 	if err != nil {
 		api.RespondWithError(w, http.StatusInternalServerError, "Could not create user", err)
 		return
 	}
 
-	// Respuesta sin incluir la contraseña
+	// Responder con la información del usuario (sin la contraseña)
 	response := api.CreateUserResponse{
-		ID:        newUser.ID,
-		CreatedAt: newUser.CreatedAt,
-		UpdatedAt: newUser.UpdatedAt,
-		Email:     newUser.Email,
+		ID:          newUser.ID,
+		CreatedAt:   newUser.CreatedAt,
+		UpdatedAt:   newUser.UpdatedAt,
+		Email:       newUser.Email,
+		IsChirpyRed: newUser.IsChirpyRed,
 	}
 
 	api.RespondWithJSON(w, http.StatusCreated, response)

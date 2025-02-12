@@ -17,7 +17,8 @@ import (
 type apiConfig struct {
 	DB        *database.Queries
 	Platform  string
-	JWTSecret string // 🔹 Agregamos el campo para el secreto JWT
+	JWTSecret string
+	PolkaKey  string // 🔹 Agregamos el campo para almacenar la API Key de Polka
 }
 
 func main() {
@@ -36,6 +37,11 @@ func main() {
 		log.Fatal("JWT_SECRET is not set in the environment variables")
 	}
 
+	polkaKey := os.Getenv("POLKA_KEY") // 🔹 Cargamos la API Key de Polka
+	if polkaKey == "" {
+		log.Fatal("POLKA_KEY is not set in the environment variables")
+	}
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Could not connect to database:", err)
@@ -47,12 +53,14 @@ func main() {
 	}
 
 	apiCfg := apiConfig{
-		DB:       database.New(db),
-		Platform: os.Getenv("PLATFORM"),
+		DB:        database.New(db),
+		Platform:  os.Getenv("PLATFORM"),
+		JWTSecret: jwtSecret,
+		PolkaKey:  polkaKey, // 🔹 Guardamos la API Key de Polka en apiConfig
 	}
 
-	// 🔹 Pasamos jwtSecret al crear el Handler
-	handlers := handler.NewHandler(apiCfg.DB, apiCfg.Platform, jwtSecret)
+	// 🔹 Pasamos polkaKey al crear el Handler
+	handlers := handler.NewHandler(apiCfg.DB, apiCfg.Platform, apiCfg.JWTSecret, apiCfg.PolkaKey)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/users", handlers.CreateUser)
@@ -60,9 +68,12 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", handlers.GetChirps)
 	mux.HandleFunc("POST /admin/reset", handlers.ResetDatabase)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetChirpByID)
+	mux.HandleFunc("POST /api/polka/webhooks", handlers.PolkaWebhook)
 	mux.HandleFunc("POST /api/login", handlers.Login)
 	mux.HandleFunc("POST /api/refresh", handlers.RefreshTokenHandler)
 	mux.HandleFunc("POST /api/revoke", handlers.RevokeTokenHandler)
+	mux.HandleFunc("PUT /api/users", handlers.UpdateUser)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", handlers.DeleteChirp)
 
 	server := &http.Server{
 		Addr:    ":8080",
